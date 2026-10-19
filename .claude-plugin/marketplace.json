@@ -1,7 +1,8 @@
 {
-  "name": "brandon-mods",
-  "owner": { "name": "Brandon" },
+  "name": "repo-color",
+  "owner": { "name": "lucrabrandon" },
+  "metadata": { "description": "Per-repo message colors for Claude Code" },
   "plugins": [
-    { "name": "repo-color", "source": "./", "description": "Set a color per repo and show it as a bar above the prompt" }
+    { "name": "repo-color", "source": "./", "description": "Give each repo a color and draw your messages in it, so you can tell sessions apart at a glance" }
   ]
 }

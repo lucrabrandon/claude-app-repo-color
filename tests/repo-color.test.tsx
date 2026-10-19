@@ -29,7 +29,7 @@ function fakeRepo(on: On) {
 
 test('a repo with no color set gets a stable default', async () => {
   expect(defaultColorFor('app')).toBe(defaultColorFor('app'))
-  expect(parseColor(defaultColorFor('lucra-forge-api'))).not.toBe(null)
+  expect(parseColor(defaultColorFor('my-other-repo'))).not.toBe(null)
 })
 
 test('hslToHex lands on known colors', async () => {
