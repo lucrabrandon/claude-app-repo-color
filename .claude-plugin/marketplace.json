@@ -1,0 +1,7 @@
+{
+  "name": "brandon-mods",
+  "owner": { "name": "Brandon" },
+  "plugins": [
+    { "name": "repo-color", "source": "./", "description": "Set a color per repo and show it as a bar above the prompt" }
+  ]
+}

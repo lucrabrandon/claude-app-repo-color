@@ -1,0 +1,6 @@
+{
+  "name": "repo-color",
+  "version": "0.2.0",
+  "description": "Set a color per repo and show it as a bar above the prompt",
+  "types": "./types/index.d.ts"
+}
