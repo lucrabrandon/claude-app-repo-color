@@ -310,6 +310,9 @@ export const register: Register = on => {
   on('prompt.submit', async ($, e, next) => {
     if (e.attachments?.length) {
       await update($, withMedia, texts => [...texts, e.text])
+      // The desktop can draw the row before this write lands and does not
+      // redraw it for the write, so ask for the redraw outright.
+      $.ui.invalidate('ui.render')
     }
 
     return next(e)
@@ -317,14 +320,12 @@ export const register: Register = on => {
 
   // Draws each prompt you send as a right-aligned rounded bubble, bordered in
   // the repo color. Wrapping the engine's own drawing outlines its whole
-  // reserved area, not the bubble, so the bubble is ours.
+  // reserved area, not the bubble, so the bubble is ours. A prompt sent with
+  // images keeps the engine's drawing for them, with the text taken out, and
+  // our bubble below it holds the text.
   on('ui.render', { component: 'UserMessage' }, async ($, e, next) => {
     const current = await read($, repo)
-    if (
-      !current ||
-      !PERSON.has(e.props.origin.kind) ||
-      (await read($, withMedia)).includes(e.props.text)
-    ) {
+    if (!current || !PERSON.has(e.props.origin.kind)) {
       return next(e)
     }
 
@@ -333,18 +334,32 @@ export const register: Register = on => {
       await read($, opacity),
     )
     const { Box, Text } = $.ui.resolve(e)
+    const bubble = e.props.text ? (
+      <Box
+        key="bubble"
+        borderStyle="round"
+        borderColor={fill}
+        backgroundColor={BUBBLE}
+        paddingX={1}
+      >
+        <Text>{e.props.text}</Text>
+      </Box>
+    ) : null
+
+    if (!(await read($, withMedia)).includes(e.props.text)) {
+      return (
+        <Box flexDirection="row" justifyContent="flex-end">
+          {bubble}
+        </Box>
+      )
+    }
+
+    const media = await next({ ...e, props: { ...e.props, text: '' } })
 
     return (
-      <Box flexDirection="row" justifyContent="flex-end">
-        <Box
-          key="bubble"
-          borderStyle="round"
-          borderColor={fill}
-          backgroundColor={BUBBLE}
-          paddingX={1}
-        >
-          <Text>{e.props.text}</Text>
-        </Box>
+      <Box flexDirection="column" alignItems="flex-end" gap={1}>
+        {media}
+        {bubble}
       </Box>
     )
   })

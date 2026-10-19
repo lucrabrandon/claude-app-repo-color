@@ -134,7 +134,7 @@ describe('opacity', () => {
   })
 })
 
-test('a prompt sent with an image keeps the engine drawing so the image shows', async ($, on) => {
+test('a prompt sent with an image keeps the engine drawing for it and the bubble for its text', async ($, on) => {
   fakeRepo(on)
   on('prompt.submit', async (_, e) => ({ text: e.text }))
   // Stands in for the engine's own drawing, which shows the image.
@@ -156,8 +156,11 @@ test('a prompt sent with an image keeps the engine drawing so the image shows', 
       component: 'UserMessage',
       props: { text: 'see this', origin: { kind: 'composer' }, isExpanded: true },
     })
-    expect(await withImage.find({ key: 'bubble' })).toBeUndefined()
-    expect(await withImage.find({ type: 'Text', text: 'engine: see this' })).toBeDefined()
+    expect((await withImage.find({ key: 'bubble' }))?.props.borderColor).toBe('#8e4ec6')
+    expect(await withImage.find({ type: 'Text', text: 'see this' })).toBeDefined()
+    // The engine draws the image with the text taken out, so it shows once.
+    expect(await withImage.find({ type: 'Text', text: 'engine: ' })).toBeDefined()
+    expect(await withImage.find({ type: 'Text', text: 'engine: see this' })).toBeUndefined()
     await withImage.unmount()
 
     const plain = await $.ui.mount({
@@ -169,4 +172,28 @@ test('a prompt sent with an image keeps the engine drawing so the image shows', 
     expect(await plain.find({ key: 'bubble' })).toBeDefined()
     await plain.unmount()
   }
+})
+
+test('a row drawn before its image prompt is recorded redraws with the image', async ($, on) => {
+  fakeRepo(on)
+  on('prompt.submit', async (_, e) => ({ text: e.text }))
+  on('ui.render', { component: 'UserMessage' }, async ($e, e) => {
+    const { Text } = $e.ui.resolve(e)
+
+    return <Text>{`engine: ${e.props.text}`}</Text>
+  })
+  await run($, 'purple')
+
+  const ui = await $.ui.mount({
+    plugin: 'repo-color',
+    surface: 'desktop',
+    component: 'UserMessage',
+    props: { text: 'late', origin: { kind: 'sdk' }, isExpanded: true },
+  })
+  expect(await ui.find({ type: 'Text', text: 'engine: ' })).toBeUndefined()
+
+  await $.prompt.submit({ text: 'late', attachments: [{ type: 'image', mediaType: 'image/png' }] })
+  expect(await ui.find({ type: 'Text', text: 'engine: ' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: 'late' })).toBeDefined()
+  await ui.unmount()
 })
