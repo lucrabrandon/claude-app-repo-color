@@ -1,6 +1,6 @@
 {
   "name": "repo-color",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Give each repo a color and draw your messages in it, so you can tell sessions apart at a glance",
   "author": { "name": "lucrabrandon", "url": "https://github.com/lucrabrandon" },
   "license": "MIT",

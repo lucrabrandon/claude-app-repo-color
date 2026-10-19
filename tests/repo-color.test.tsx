@@ -133,3 +133,40 @@ describe('opacity', () => {
     }
   })
 })
+
+test('a prompt sent with an image keeps the engine drawing so the image shows', async ($, on) => {
+  fakeRepo(on)
+  on('prompt.submit', async (_, e) => ({ text: e.text }))
+  // Stands in for the engine's own drawing, which shows the image.
+  on('ui.render', { component: 'UserMessage' }, async ($e, e) => {
+    const { Text } = $e.ui.resolve(e)
+
+    return <Text>{`engine: ${e.props.text}`}</Text>
+  })
+  await run($, 'purple')
+  await $.prompt.submit({
+    text: 'see this',
+    attachments: [{ type: 'image', mediaType: 'image/png' }],
+  })
+
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const withImage = await $.ui.mount({
+      plugin: 'repo-color',
+      surface,
+      component: 'UserMessage',
+      props: { text: 'see this', origin: { kind: 'composer' }, isExpanded: true },
+    })
+    expect(await withImage.find({ key: 'bubble' })).toBeUndefined()
+    expect(await withImage.find({ type: 'Text', text: 'engine: see this' })).toBeDefined()
+    await withImage.unmount()
+
+    const plain = await $.ui.mount({
+      plugin: 'repo-color',
+      surface,
+      component: 'UserMessage',
+      props: { text: 'hello', origin: { kind: 'composer' }, isExpanded: true },
+    })
+    expect(await plain.find({ key: 'bubble' })).toBeDefined()
+    await plain.unmount()
+  }
+})

@@ -6,6 +6,7 @@ import type { Repo } from '../types'
 const repo = atom({ plugin: 'repo-color', key: 'repo' } as const, null)
 const color = atom({ plugin: 'repo-color', key: 'color' } as const, null)
 const opacity = atom({ plugin: 'repo-color', key: 'opacity' } as const, 100)
+const withMedia = atom({ plugin: 'repo-color', key: 'withMedia' } as const, [] as string[])
 
 const PRESETS: Record<string, string> = {
   red: '#e5484d',
@@ -304,12 +305,26 @@ export const register: Register = on => {
     return {}
   })
 
+  // The row only carries a prompt's text, so remember which prompts had images
+  // or files attached and leave those rows to the engine, which draws them.
+  on('prompt.submit', async ($, e, next) => {
+    if (e.attachments?.length) {
+      await update($, withMedia, texts => [...texts, e.text])
+    }
+
+    return next(e)
+  })
+
   // Draws each prompt you send as a right-aligned rounded bubble, bordered in
   // the repo color. Wrapping the engine's own drawing outlines its whole
   // reserved area, not the bubble, so the bubble is ours.
   on('ui.render', { component: 'UserMessage' }, async ($, e, next) => {
     const current = await read($, repo)
-    if (!current || !PERSON.has(e.props.origin.kind)) {
+    if (
+      !current ||
+      !PERSON.has(e.props.origin.kind) ||
+      (await read($, withMedia)).includes(e.props.text)
+    ) {
       return next(e)
     }
 
