@@ -1,8 +1,8 @@
 {
   "name": "repo-color",
   "owner": { "name": "lucrabrandon" },
-  "metadata": { "description": "Per-repo message colors for Claude Code" },
+  "metadata": { "description": "Per-repo status line colors for Claude Code" },
   "plugins": [
-    { "name": "repo-color", "source": "./", "description": "Give each repo a color and draw your messages in it, so you can tell sessions apart at a glance" }
+    { "name": "repo-color", "source": "./", "description": "Give each repo a color, shown in the status line, so you can tell sessions apart at a glance" }
   ]
 }

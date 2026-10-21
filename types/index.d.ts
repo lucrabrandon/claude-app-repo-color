@@ -5,9 +5,6 @@ declare module 'claude-code' {
     'repo-color': {
       repo: Repo | null
       color: string | null
-      opacity: number
-      // Prompts sent with images or files. Their rows keep the engine's drawing.
-      withMedia: string[]
     }
   }
 }

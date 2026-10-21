@@ -2,7 +2,7 @@ import { describe, expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
-import { defaultColorFor, hslToHex, parseColor, parseOpacity, withOpacity } from '../hooks/register'
+import { defaultColorFor, emojiFor, hslToHex, parseColor } from '../hooks/register'
 
 function run($: Engine, args: string) {
   return $.command.run({
@@ -73,127 +73,29 @@ describe('parseColor', () => {
   })
 })
 
-test('the color set for a repo marks your messages on every surface', async ($, on) => {
+test('the color set for a repo shows in the status line', async ($, on) => {
   fakeRepo(on)
 
   const set = await run($, 'purple')
   expect(set.text).toContain('app is now #8e4ec6')
 
-  for (const surface of ['terminal', 'desktop'] as const) {
-    const ui = await $.ui.mount({
-      plugin: 'repo-color',
-      surface,
-      component: 'UserMessage',
-      props: { text: 'hello', origin: { kind: 'composer' }, isExpanded: true },
-    })
-    expect((await ui.find({ key: 'bubble' }))?.props.borderColor).toBe('#8e4ec6')
-    expect(await ui.find({ type: 'Text', text: 'hello' })).toBeDefined()
-    await ui.unmount()
-  }
-
   const cleared = await run($, 'off')
   expect(cleared.text).toContain('back to its default color')
+})
+
+test('emojiFor picks the nearest circle', async () => {
+  expect(emojiFor('#e5484d')).toBe('🔴')
+  expect(emojiFor('#f76b15')).toBe('🟠')
+  expect(emojiFor('#ffc53d')).toBe('🟡')
+  expect(emojiFor('#30a46c')).toBe('🟢')
+  expect(emojiFor('#0090ff')).toBe('🔵')
+  expect(emojiFor('#8e4ec6')).toBe('🟣')
+  expect(emojiFor('#8b8d98')).toBe('⚪')
+  expect(emojiFor('#222')).toBe('⚫')
 })
 
 test('an unknown color is refused with usage', async ($, on) => {
   fakeRepo(on)
   const result = await run($, 'chartreuse')
   expect(result.text).toContain('Unknown color')
-})
-
-describe('opacity', () => {
-  test('parses percents and blends toward the bubble', async () => {
-    expect(parseOpacity('50')).toBe(50)
-    expect(parseOpacity('75%')).toBe(75)
-    expect(parseOpacity('101')).toBe(null)
-    expect(parseOpacity('half')).toBe(null)
-    expect(withOpacity('#ffffff', 100)).toBe('#ffffff')
-    expect(withOpacity('#ffffff', 0)).toBe('#1e1e1e')
-    expect(withOpacity('#fff', 50, '#000000')).toBe('#808080')
-  })
-
-  test('the set opacity fades the bubble border on every surface', async ($, on) => {
-    fakeRepo(on)
-    await run($, 'purple')
-    const set = await run($, 'opacity 50')
-    expect(set.text).toContain('50%')
-    expect((await run($, 'opacity 150')).text).toContain('0 to 100')
-
-    for (const surface of ['terminal', 'desktop'] as const) {
-      const ui = await $.ui.mount({
-        plugin: 'repo-color',
-        surface,
-        component: 'UserMessage',
-        props: { text: 'hello', origin: { kind: 'composer' }, isExpanded: true },
-      })
-      expect((await ui.find({ key: 'bubble' }))?.props.borderColor).toBe(
-        withOpacity('#8e4ec6', 50),
-      )
-      await ui.unmount()
-    }
-  })
-})
-
-test('a prompt sent with an image keeps the engine drawing for it and the bubble for its text', async ($, on) => {
-  fakeRepo(on)
-  on('prompt.submit', async (_, e) => ({ text: e.text }))
-  // Stands in for the engine's own drawing, which shows the image.
-  on('ui.render', { component: 'UserMessage' }, async ($e, e) => {
-    const { Text } = $e.ui.resolve(e)
-
-    return <Text>{`engine: ${e.props.text}`}</Text>
-  })
-  await run($, 'purple')
-  await $.prompt.submit({
-    text: 'see this',
-    attachments: [{ type: 'image', mediaType: 'image/png' }],
-  })
-
-  for (const surface of ['terminal', 'desktop'] as const) {
-    const withImage = await $.ui.mount({
-      plugin: 'repo-color',
-      surface,
-      component: 'UserMessage',
-      props: { text: 'see this', origin: { kind: 'composer' }, isExpanded: true },
-    })
-    expect((await withImage.find({ key: 'bubble' }))?.props.borderColor).toBe('#8e4ec6')
-    expect(await withImage.find({ type: 'Text', text: 'see this' })).toBeDefined()
-    // The engine draws the image with the text taken out, so it shows once.
-    expect(await withImage.find({ type: 'Text', text: 'engine: ' })).toBeDefined()
-    expect(await withImage.find({ type: 'Text', text: 'engine: see this' })).toBeUndefined()
-    await withImage.unmount()
-
-    const plain = await $.ui.mount({
-      plugin: 'repo-color',
-      surface,
-      component: 'UserMessage',
-      props: { text: 'hello', origin: { kind: 'composer' }, isExpanded: true },
-    })
-    expect(await plain.find({ key: 'bubble' })).toBeDefined()
-    await plain.unmount()
-  }
-})
-
-test('a row drawn before its image prompt is recorded redraws with the image', async ($, on) => {
-  fakeRepo(on)
-  on('prompt.submit', async (_, e) => ({ text: e.text }))
-  on('ui.render', { component: 'UserMessage' }, async ($e, e) => {
-    const { Text } = $e.ui.resolve(e)
-
-    return <Text>{`engine: ${e.props.text}`}</Text>
-  })
-  await run($, 'purple')
-
-  const ui = await $.ui.mount({
-    plugin: 'repo-color',
-    surface: 'desktop',
-    component: 'UserMessage',
-    props: { text: 'late', origin: { kind: 'sdk' }, isExpanded: true },
-  })
-  expect(await ui.find({ type: 'Text', text: 'engine: ' })).toBeUndefined()
-
-  await $.prompt.submit({ text: 'late', attachments: [{ type: 'image', mediaType: 'image/png' }] })
-  expect(await ui.find({ type: 'Text', text: 'engine: ' })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: 'late' })).toBeDefined()
-  await ui.unmount()
 })

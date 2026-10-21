@@ -1,6 +1,6 @@
 # repo-color
 
-Give each repo a color in Claude Code. Your messages are drawn as a bubble bordered in that color, so you can tell sessions apart at a glance. Every worktree of a repo shares its color.
+Give each repo a color in Claude Code. The color and the repo name show in the status line under the prompt, so you can tell sessions apart at a glance. Messages and their attachments are left as the app draws them. Every worktree of a repo shares its color.
 
 ## Install
 
@@ -18,7 +18,8 @@ Start a new session after installing.
 | `/repo-color` | Opens the color picker |
 | `/repo-color <color>` | Sets this repo's color: a preset or a hex like `#ff8800` |
 | `/repo-color off` | Goes back to the default color |
-| `/repo-color opacity <0-100>` | Fades the border; applies to every repo |
+
+The status line is plain text, so the color shows as the nearest colored circle emoji.
 
 Presets: `red`, `orange`, `yellow`, `green`, `teal`, `blue`, `indigo`, `purple`, `pink`, `gray`.
 
@@ -26,7 +27,7 @@ A repo with no color set gets a stable default picked from its name.
 
 ## Requirements
 
-This is a mod. It uses the Claude Code mod runtime to redraw your messages and open the picker pane. Clients without that runtime ignore it.
+This is a mod. It uses the Claude Code mod runtime to set the status line and open the picker pane. Clients without that runtime ignore it.
 
 ## Develop
 

@@ -1,8 +1,11 @@
 {
   "name": "repo-color",
-  "version": "0.2.3",
-  "description": "Give each repo a color and draw your messages in it, so you can tell sessions apart at a glance",
-  "author": { "name": "lucrabrandon", "url": "https://github.com/lucrabrandon" },
+  "version": "0.3.0",
+  "description": "Give each repo a color, shown in the status line, so you can tell sessions apart at a glance",
+  "author": {
+    "name": "lucrabrandon",
+    "url": "https://github.com/lucrabrandon"
+  },
   "license": "MIT",
   "repository": "https://github.com/lucrabrandon/claude-app-repo-color",
   "types": "./types/index.d.ts"

@@ -5,8 +5,6 @@ import type { Repo } from '../types'
 
 const repo = atom({ plugin: 'repo-color', key: 'repo' } as const, null)
 const color = atom({ plugin: 'repo-color', key: 'color' } as const, null)
-const opacity = atom({ plugin: 'repo-color', key: 'opacity' } as const, 100)
-const withMedia = atom({ plugin: 'repo-color', key: 'withMedia' } as const, [] as string[])
 
 const PRESETS: Record<string, string> = {
   red: '#e5484d',
@@ -21,23 +19,15 @@ const PRESETS: Record<string, string> = {
   gray: '#8b8d98',
 }
 
-// Origins of a prompt the person sent: the terminal, the desktop app (SDK)
-// and Remote Control.
-const PERSON = new Set(['composer', 'sdk', 'bridge'])
-
-// A faint fill for the bubble, a step above the desktop's dark background.
-// No theme key names it.
+// A faint fill for the picker's preview, a step above the desktop's dark
+// background. No theme key names it.
 const BUBBLE = '#1e1e1e'
 
 const PICKER = 'repo-color-picker'
 
 const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i
 
-const OPACITY_KEY = 'opacity'
-
-const OPACITY_STEPS = [100, 75, 50, 25]
-
-const USAGE = `Usage: /repo-color opens the picker, or /repo-color <color> | off | opacity <0-100>\nPresets: ${Object.keys(PRESETS).join(', ')}, or a hex like #ff8800.`
+const USAGE = `Usage: /repo-color opens the picker, or /repo-color <color> | off\nPresets: ${Object.keys(PRESETS).join(', ')}, or a hex like #ff8800.`
 
 export function parseColor(input: string): string | null {
   const value = input.trim().toLowerCase()
@@ -46,35 +36,6 @@ export function parseColor(input: string): string | null {
   }
 
   return HEX.test(value) ? value : null
-}
-
-export function parseOpacity(input: string): number | null {
-  const value = input.trim().replace(/%$/, '')
-  if (!/^\d{1,3}$/.test(value)) {
-    return null
-  }
-  const percent = Number(value)
-
-  return percent <= 100 ? percent : null
-}
-
-// Mixes the color into the bubble fill. Surfaces take no alpha in a color, so
-// opacity is drawn as a blend toward the background instead.
-export function withOpacity(hex: string, percent: number, background = BUBBLE): string {
-  const channels = (value: string) => {
-    const digits = value.slice(1)
-    const full = digits.length === 3 ? [...digits].map(d => d + d).join('') : digits
-
-    return [0, 2, 4].map(i => parseInt(full.slice(i, i + 2), 16))
-  }
-  const top = channels(hex)
-  const bottom = channels(background)
-  const alpha = percent / 100
-
-  return `#${top
-    .map((value, i) => Math.round(value * alpha + bottom[i]! * (1 - alpha)))
-    .map(value => value.toString(16).padStart(2, '0'))
-    .join('')}`
 }
 
 // A stable preset per repo name, used until /repo-color sets one.
@@ -102,6 +63,53 @@ export function hslToHex(hue: number, saturation: number, lightness: number): st
   }
 
   return `#${channel(0)}${channel(8)}${channel(4)}`
+}
+
+// The status line is plain text, so the color shows as the nearest colored
+// circle emoji.
+export function emojiFor(hex: string): string {
+  const digits = hex.slice(1)
+  const full = digits.length === 3 ? [...digits].map(d => d + d).join('') : digits
+  const [r, g, b] = [0, 2, 4].map(i => parseInt(full.slice(i, i + 2), 16) / 255) as [
+    number,
+    number,
+    number,
+  ]
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+  const lightness = (max + min) / 2
+  const delta = max - min
+  if (delta < 0.12) {
+    return lightness > 0.5 ? '⚪' : '⚫'
+  }
+
+  const sector =
+    max === r ? ((g - b) / delta) % 6 : max === g ? (b - r) / delta + 2 : (r - g) / delta + 4
+  const hue = (sector * 60 + 360) % 360
+  if (hue >= 15 && hue < 38 && lightness < 0.35) {
+    return '🟤'
+  }
+  if (hue < 15 || hue >= 340) {
+    return '🔴'
+  }
+  if (hue < 38) {
+    return '🟠'
+  }
+  if (hue < 70) {
+    return '🟡'
+  }
+  if (hue < 165) {
+    return '🟢'
+  }
+  if (hue < 255) {
+    return '🔵'
+  }
+
+  return '🟣'
+}
+
+export function statusText(current: Repo, hex: string | null): string {
+  return `${emojiFor(hex ?? defaultColorFor(current.name))} ${current.name}`
 }
 
 // The picker's grid: twelve hues around the wheel, light to dark, then grays.
@@ -145,28 +153,23 @@ async function applyColor($: EngineInterface, hex: string | null) {
   }
   await update($, repo, () => current)
   await update($, color, () => hex)
+  $.ui.status(statusText(current, hex))
 
   return current
-}
-
-// One opacity for every repo.
-async function applyOpacity($: EngineInterface, percent: number) {
-  await $.store.set(OPACITY_KEY, percent)
-  await update($, opacity, () => percent)
 }
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'repo-color',
-      description: 'Set a color for this repo, shown beside your messages',
+      description: 'Set a color for this repo, shown in the status line',
     })
     const found = await findRepo($)
     const saved = await $.store.get(storeKey(found.key))
+    const hex = typeof saved === 'string' ? saved : null
     await update($, repo, () => found)
-    await update($, color, () => (typeof saved === 'string' ? saved : null))
-    const savedOpacity = await $.store.get(OPACITY_KEY)
-    await update($, opacity, () => (typeof savedOpacity === 'number' ? savedOpacity : 100))
+    await update($, color, () => hex)
+    $.ui.status(statusText(found, hex))
 
     return next(e)
   })
@@ -186,17 +189,6 @@ export const register: Register = on => {
       return { text: `${current.name} is back to its default color.` }
     }
 
-    const opacityArg = arg.match(/^opacity\s+(.+)$/i)
-    if (opacityArg) {
-      const percent = parseOpacity(opacityArg[1]!)
-      if (percent === null) {
-        return { text: `Opacity is a number from 0 to 100, not "${opacityArg[1]}".` }
-      }
-      await applyOpacity($, percent)
-
-      return { text: `Repo color opacity is now ${percent}%.` }
-    }
-
     const parsed = parseColor(arg)
     if (!parsed) {
       return { text: `Unknown color "${arg}".\n${USAGE}` }
@@ -211,7 +203,6 @@ export const register: Register = on => {
     const current = await read($, repo)
     const set = await read($, color)
     const fill = set ?? defaultColorFor(current?.name ?? '')
-    const percent = await read($, opacity)
     const elements = $.ui.resolve(e)
     const { Box, Button, Text } = elements
     // The mobile app draws no field, so no hex input there.
@@ -225,13 +216,13 @@ export const register: Register = on => {
           <Box
             key="preview"
             borderStyle="round"
-            borderColor={withOpacity(fill, percent)}
+            borderColor={fill}
             backgroundColor={BUBBLE}
             paddingX={1}
           >
             <Text>{current?.name ?? 'this repo'}</Text>
           </Box>
-          <Text dimColor>{`${set ?? `${fill} (default)`} at ${percent}%`}</Text>
+          <Text dimColor>{set ?? `${fill} (default)`}</Text>
         </Box>
         {Client ? (
           <Client
@@ -269,17 +260,6 @@ export const register: Register = on => {
           />
         )}
         <Box flexDirection="row" gap={1}>
-          <Text>Opacity</Text>
-          {OPACITY_STEPS.map(step => (
-            <Button
-              key={`opacity-${step}`}
-              label={`${step}%`}
-              variant={step === percent ? 'primary' : 'secondary'}
-              onPress={() => applyOpacity($, step)}
-            />
-          ))}
-        </Box>
-        <Box flexDirection="row" gap={1}>
           <Button key="reset" label="Use default" onPress={() => applyColor($, null)} />
           <Button
             key="done"
@@ -303,64 +283,5 @@ export const register: Register = on => {
     }
 
     return {}
-  })
-
-  // The row only carries a prompt's text, so remember which prompts had images
-  // or files attached and leave those rows to the engine, which draws them.
-  on('prompt.submit', async ($, e, next) => {
-    if (e.attachments?.length) {
-      await update($, withMedia, texts => [...texts, e.text])
-      // The desktop can draw the row before this write lands and does not
-      // redraw it for the write, so ask for the redraw outright.
-      $.ui.invalidate('ui.render')
-    }
-
-    return next(e)
-  })
-
-  // Draws each prompt you send as a right-aligned rounded bubble, bordered in
-  // the repo color. Wrapping the engine's own drawing outlines its whole
-  // reserved area, not the bubble, so the bubble is ours. A prompt sent with
-  // images keeps the engine's drawing for them, with the text taken out, and
-  // our bubble below it holds the text.
-  on('ui.render', { component: 'UserMessage' }, async ($, e, next) => {
-    const current = await read($, repo)
-    if (!current || !PERSON.has(e.props.origin.kind)) {
-      return next(e)
-    }
-
-    const fill = withOpacity(
-      (await read($, color)) ?? defaultColorFor(current.name),
-      await read($, opacity),
-    )
-    const { Box, Text } = $.ui.resolve(e)
-    const bubble = e.props.text ? (
-      <Box
-        key="bubble"
-        borderStyle="round"
-        borderColor={fill}
-        backgroundColor={BUBBLE}
-        paddingX={1}
-      >
-        <Text>{e.props.text}</Text>
-      </Box>
-    ) : null
-
-    if (!(await read($, withMedia)).includes(e.props.text)) {
-      return (
-        <Box flexDirection="row" justifyContent="flex-end">
-          {bubble}
-        </Box>
-      )
-    }
-
-    const media = await next({ ...e, props: { ...e.props, text: '' } })
-
-    return (
-      <Box flexDirection="column" alignItems="flex-end" gap={1}>
-        {media}
-        {bubble}
-      </Box>
-    )
   })
 }
