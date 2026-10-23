@@ -2,7 +2,7 @@ import { describe, expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
-import { defaultColorFor, emojiFor, hslToHex, parseColor } from '../hooks/register'
+import { CIRCLES, defaultColorFor, emojiFor, parseColor } from '../hooks/register'
 
 function run($: Engine, args: string) {
   return $.command.run({
@@ -32,13 +32,7 @@ test('a repo with no color set gets a stable default', async () => {
   expect(parseColor(defaultColorFor('my-other-repo'))).not.toBe(null)
 })
 
-test('hslToHex lands on known colors', async () => {
-  expect(hslToHex(0, 100, 50)).toBe('#ff0000')
-  expect(hslToHex(120, 100, 50)).toBe('#00ff00')
-  expect(hslToHex(0, 0, 50)).toBe('#808080')
-})
-
-test('the picker sets a color from a swatch and from hex', async ($, on) => {
+test('the picker sets one of the status line circles', async ($, on) => {
   fakeRepo(on)
 
   for (const surface of ['terminal', 'desktop'] as const) {
@@ -49,18 +43,17 @@ test('the picker sets a color from a swatch and from hex', async ($, on) => {
       requestId: 'repo-color-picker',
       props: { title: 'Repo color', bodyColumns: 60 } as never,
     })
-    // Second swatch of the second row: x 3 is its first cell, y 1 its row.
-    const orange = hslToHex(30, 80, 58)
-    await ui.pointer({ type: 'down', x: 3, y: 1, button: 'left' })
-    expect(await ui.find({ type: 'Text', text: orange })).toBeDefined()
-
-    // A click on the gap between swatches picks nothing.
-    await ui.pointer({ type: 'down', x: 2, y: 0, button: 'left' })
-    expect(await ui.find({ type: 'Text', text: orange })).toBeDefined()
-
-    await ui.input({ key: 'hex', text: '#123456' })
-    expect(await ui.find({ type: 'Text', text: '#123456' })).toBeDefined()
+    await ui.press({ key: '🟤' })
+    expect(await ui.find({ type: 'Text', text: '🟤 app' })).toBeDefined()
+    await ui.press({ key: '⚪' })
+    expect(await ui.find({ type: 'Text', text: '⚪ app' })).toBeDefined()
     await ui.unmount()
+  }
+})
+
+test('every circle in the picker shows as itself', async () => {
+  for (const [emoji, hex] of CIRCLES) {
+    expect(emojiFor(hex)).toBe(emoji)
   }
 })
 

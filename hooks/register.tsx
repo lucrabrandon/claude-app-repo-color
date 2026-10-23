@@ -49,22 +49,6 @@ export function defaultColorFor(name: string): string {
   return presets[hash % presets.length]!
 }
 
-export function hslToHex(hue: number, saturation: number, lightness: number): string {
-  const s = saturation / 100
-  const l = lightness / 100
-  const a = s * Math.min(l, 1 - l)
-  const channel = (n: number) => {
-    const k = (n + hue / 30) % 12
-    const value = l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1))
-
-    return Math.round(value * 255)
-      .toString(16)
-      .padStart(2, '0')
-  }
-
-  return `#${channel(0)}${channel(8)}${channel(4)}`
-}
-
 // The status line is plain text, so the color shows as the nearest colored
 // circle emoji.
 export function emojiFor(hex: string): string {
@@ -112,12 +96,18 @@ export function statusText(current: Repo, hex: string | null): string {
   return `${emojiFor(hex ?? defaultColorFor(current.name))} ${current.name}`
 }
 
-// The picker's grid: twelve hues around the wheel, light to dark, then grays.
-const SWATCHES: string[][] = [
-  ...[72, 58, 44].map(lightness =>
-    Array.from({ length: 12 }, (_, i) => hslToHex(i * 30, 80, lightness)),
-  ),
-  [92, 80, 68, 56, 44, 32].map(lightness => hslToHex(0, 0, lightness)),
+// The picker offers exactly the circles the status line can show, each saved as
+// a color that maps back to it.
+export const CIRCLES: [emoji: string, hex: string][] = [
+  ['🔴', '#e5484d'],
+  ['🟠', '#f76b15'],
+  ['🟡', '#ffc53d'],
+  ['🟢', '#30a46c'],
+  ['🔵', '#0090ff'],
+  ['🟣', '#8e4ec6'],
+  ['🟤', '#6b4423'],
+  ['⚫', '#2b2b2b'],
+  ['⚪', '#e8e8e8'],
 ]
 
 function storeKey(key: string): string {
@@ -203,12 +193,8 @@ export const register: Register = on => {
     const current = await read($, repo)
     const set = await read($, color)
     const fill = set ?? defaultColorFor(current?.name ?? '')
-    const elements = $.ui.resolve(e)
-    const { Box, Button, Text } = elements
-    // The mobile app draws no field, so no hex input there.
-    const Input = 'Input' in elements ? elements.Input : null
-    // Surfaces without Client (mobile, VS Code) fall back to dot buttons.
-    const Client = 'Client' in elements ? elements.Client : null
+    const { Box, Button, Text } = $.ui.resolve(e)
+    const shown = emojiFor(fill)
 
     return (
       <Box flexDirection="column" gap={1}>
@@ -220,45 +206,17 @@ export const register: Register = on => {
             backgroundColor={BUBBLE}
             paddingX={1}
           >
-            <Text>{current?.name ?? 'this repo'}</Text>
+            <Text>{`${shown} ${current?.name ?? 'this repo'}`}</Text>
           </Box>
-          <Text dimColor>{set ?? `${fill} (default)`}</Text>
+          {!set && <Text dimColor>(default)</Text>}
         </Box>
-        {Client ? (
-          <Client
-            key="swatches"
-            module="./swatches.tsx"
-            props={{ rows: SWATCHES, selected: set }}
-          />
-        ) : (
-          <Box flexDirection="column">
-            {SWATCHES.map((row, i) => (
-              <Box key={`row-${i}`} flexDirection="row">
-                {row.map(hex => (
-                  <Button key={hex} plain onPress={() => applyColor($, hex)}>
-                    <Text color={hex}>{hex === set ? '◉' : '●'}</Text>
-                  </Button>
-                ))}
-              </Box>
-            ))}
-          </Box>
-        )}
-        {Input && (
-          <Input
-            key="hex"
-            label="Hex"
-            placeholder="#ff8800"
-            submitLabel="Set"
-            onSubmit={async (value: string) => {
-              const parsed = parseColor(value)
-              if (parsed) {
-                await applyColor($, parsed)
-              } else {
-                $.ui.toast(`Not a color: ${value}`)
-              }
-            }}
-          />
-        )}
+        <Box flexDirection="row" gap={1}>
+          {CIRCLES.map(([emoji, hex]) => (
+            <Button key={emoji} plain onPress={() => applyColor($, hex)}>
+              <Text>{emoji}</Text>
+            </Button>
+          ))}
+        </Box>
         <Box flexDirection="row" gap={1}>
           <Button key="reset" label="Use default" onPress={() => applyColor($, null)} />
           <Button
@@ -272,16 +230,4 @@ export const register: Register = on => {
     )
   })
 
-  on('ui.message', async ($, e, next) => {
-    if (e.requestId !== PICKER || e.element !== 'swatches') {
-      return next(e)
-    }
-    const data = e.data as { pick?: unknown }
-    const parsed = typeof data?.pick === 'string' ? parseColor(data.pick) : null
-    if (parsed) {
-      await applyColor($, parsed)
-    }
-
-    return {}
-  })
 }

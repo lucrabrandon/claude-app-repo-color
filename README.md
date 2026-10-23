@@ -15,11 +15,11 @@ Start a new session after installing.
 
 | Command | What it does |
 | --- | --- |
-| `/repo-color` | Opens the color picker |
+| `/repo-color` | Opens the picker: one of the nine circles the status line can show |
 | `/repo-color <color>` | Sets this repo's color: a preset or a hex like `#ff8800` |
 | `/repo-color off` | Goes back to the default color |
 
-The status line is plain text, so the color shows as the nearest colored circle emoji.
+The status line is plain text, so a preset or hex shows as the nearest colored circle emoji.
 
 Presets: `red`, `orange`, `yellow`, `green`, `teal`, `blue`, `indigo`, `purple`, `pink`, `gray`.
 
